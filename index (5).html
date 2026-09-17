@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gravador de Reuniões</title>
+
+  <style>
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f3ff;
+      color: #202124;
+    }
+
+    header {
+      background: linear-gradient(135deg, #5b21b6, #7c3aed);
+      color: white;
+      padding: 25px 35px;
+    }
+
+    header h1 { margin: 0; font-size: 25px; }
+    header p { margin: 7px 0 0; opacity: .9; }
+
+    .container {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 20px;
+      box-shadow: 0 5px 20px rgba(0,0,0,.07);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    input:focus { outline: none; border-color: #7c3aed; }
+    input.invalido { border-color: #dc2626; }
+
+    .aviso-email {
+      font-size: 12px;
+      color: #dc2626;
+      margin: -10px 0 15px;
+      display: none;
+    }
+
+    .timer {
+      text-align: center;
+      font-size: 48px;
+      font-weight: bold;
+      color: #5b21b6;
+      margin: 25px 0;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      padding: 13px 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .primary { background: #7c3aed; color: white; }
+    .danger { background: #dc2626; color: white; }
+    .secondary { background: #ede9fe; color: #5b21b6; }
+
+    .status {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .status.gravando { color: #dc2626; font-weight: bold; }
+    .status.ok { color: #15803d; font-weight: bold; }
+    .status.erro { color: #dc2626; font-weight: bold; }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 25px;
+      color: #5b21b6;
+      font-weight: bold;
+    }
+
+    .result { display: none; }
+
+    .section {
+      border-left: 4px solid #7c3aed;
+      padding-left: 15px;
+      margin-top: 25px;
+    }
+
+    .section h3 { margin-top: 0; color: #5b21b6; }
+
+    .transcricao {
+      white-space: pre-wrap;
+      background: #fafafa;
+      padding: 18px;
+      border-radius: 10px;
+      line-height: 1.6;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .item {
+      background: #f8f7ff;
+      padding: 12px 15px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .pendencia {
+      border: 1px solid #ddd;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      background: white;
+    }
+
+    .pendencia strong { display: block; margin-bottom: 7px; }
+
+    .historico table { width: 100%; border-collapse: collapse; }
+
+    .historico th, .historico td {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    @media(max-width:700px) {
+      .timer { font-size: 38px; }
+      .card { padding: 18px; }
+    }
+
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>🎙️ Gravador de Reuniões</h1>
+  <p>Transcrição automática e resumo inteligente</p>
+</header>
+
+<div class="container">
+
+  <!-- IDENTIFICAÇÃO -->
+  <div class="card">
+
+    <label>Seu e-mail corporativo</label>
+    <input id="emailUsuario" type="email" placeholder="voce@jzresgate.com.br">
+    <div id="avisoEmail" class="aviso-email">
+      Informe um e-mail válido do domínio permitido.
+    </div>
+
+  </div>
+
+  <!-- GRAVADOR -->
+  <div class="card">
+
+    <label>Nome da reunião</label>
+    <input id="nomeReuniao" type="text" placeholder="Ex.: Reunião Operacional - Allianz">
+
+    <label>Participantes</label>
+    <input id="participantes" type="text" placeholder="Ex.: Willian, Marcelo, Simone...">
+
+    <div class="timer" id="timer">00:00:00</div>
+
+    <div class="buttons">
+      <button id="btnIniciar" class="primary" onclick="iniciarGravacao()">🔴 Iniciar gravação</button>
+      <button id="btnPausar" class="secondary" onclick="pausarGravacao()" disabled>⏸ Pausar</button>
+      <button id="btnFinalizar" class="danger" onclick="finalizarGravacao()" disabled>⏹ Finalizar</button>
+    </div>
+
+    <div id="status" class="status">Pronto para iniciar.</div>
+
+  </div>
+
+  <!-- PROCESSAMENTO -->
+  <div id="loading" class="card loading">
+    ⏳ Processando a reunião...
+    <br><br>
+    O áudio está sendo enviado para processamento.
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="resultado" class="card result">
+
+    <h2>Resultado da reunião</h2>
+
+    <div class="section">
+      <h3>📝 Resumo executivo</h3>
+      <div id="resumo"></div>
+    </div>
+
+    <div class="section">
+      <h3>📌 Principais pontos</h3>
+      <div id="principais"></div>
+    </div>
+
+    <div class="section">
+      <h3>✅ Decisões</h3>
+      <div id="decisoes"></div>
+    </div>
+
+    <div class="section">
+      <h3>📋 Pendências</h3>
+      <div id="pendencias"></div>
+    </div>
+
+    <div class="section">
+      <h3>🚀 Próximos passos</h3>
+      <div id="proximos"></div>
+    </div>
+
+    <div class="section">
+      <h3>📄 Transcrição completa</h3>
+      <div id="transcricao" class="transcricao"></div>
+    </div>
+
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="card historico">
+
+    <h2>📚 Reuniões anteriores</h2>
+
+    <button class="secondary" onclick="carregarHistorico()">Atualizar histórico</button>
+
+    <br><br>
+
+    <div id="historico"></div>
+
+  </div>
+
+</div>
+
+<script>
+
+/* =====================================================
+   CONFIGURAÇÃO — preencha com os valores do seu deploy
+===================================================== */
+
+const CONFIG = {
+  // Cole aqui a URL do Web App do Apps Script (termina em /exec)
+  APPS_SCRIPT_URL: 'COLE_AQUI_A_URL_DO_SEU_WEB_APP/exec',
+
+  // Cole aqui o mesmo token gerado por configurarToken() no Apps Script
+  APP_TOKEN: 'COLE_AQUI_O_TOKEN_GERADO_NO_APPS_SCRIPT',
+
+  DOMINIO_PERMITIDO: '@jzresgate.com.br'
+};
+
+
+/* =====================================================
+   VARIÁVEIS DE GRAVAÇÃO
+===================================================== */
+
+let mediaRecorder = null;
+let audioChunks = [];
+let stream = null;
+let intervaloTimer = null;
+let inicioGravacao = null;
+let tempoAcumulado = 0;
+let pausado = false;
+
+
+/* =====================================================
+   E-MAIL DO USUÁRIO
+===================================================== */
+
+function carregarEmailSalvo() {
+
+  const salvo = localStorage.getItem('emailUsuario');
+
+  if (salvo) {
+    document.getElementById('emailUsuario').value = salvo;
+  }
+
+}
+
+document.getElementById('emailUsuario').addEventListener('change', function() {
+  localStorage.setItem('emailUsuario', this.value.trim());
+});
+
+carregarEmailSalvo();
+
+
+function obterEmailValido() {
+
+  const campo = document.getElementById('emailUsuario');
+  const aviso = document.getElementById('avisoEmail');
+
+  const email = campo.value.trim().toLowerCase();
+
+  const valido =
+    email.length > 3 &&
+    email.indexOf('@') > 0 &&
+    email.endsWith(CONFIG.DOMINIO_PERMITIDO.toLowerCase());
+
+  campo.classList.toggle('invalido', !valido);
+  aviso.style.display = valido ? 'none' : 'block';
+
+  return valido ? email : null;
+
+}
+
+
+/* =====================================================
+   CHAMADA AO BACKEND (Apps Script via fetch)
+===================================================== */
+
+async function chamarBackend(acao, dadosExtras) {
+
+  const email = obterEmailValido();
+
+  if (!email) {
+    throw new Error('Informe um e-mail válido do domínio ' + CONFIG.DOMINIO_PERMITIDO + ' antes de continuar.');
+  }
+
+  const payload = Object.assign(
+    {
+      acao: acao,
+      token: CONFIG.APP_TOKEN,
+      email: email
+    },
+    dadosExtras || {}
+  );
+
+  const resposta = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: 'POST',
+    // Content-Type text/plain evita o preflight CORS que o Apps Script não suporta.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!resposta.ok) {
+    throw new Error('Erro de comunicação com o servidor (HTTP ' + resposta.status + ').');
+  }
+
+  const json = await resposta.json();
+
+  if (!json.sucesso) {
+    throw new Error(json.erro || 'Erro desconhecido no servidor.');
+  }
+
+  return json.dados;
+
+}
+
+
+/* =====================================================
+   INICIAR GRAVAÇÃO
+===================================================== */
+
+async function iniciarGravacao() {
+
+  const status = document.getElementById('status');
+
+  if (!obterEmailValido()) {
+    alert('Informe um e-mail válido do domínio ' + CONFIG.DOMINIO_PERMITIDO + ' antes de iniciar.');
+    return;
+  }
+
+  try {
+
+    status.className = 'status';
+    status.innerText = '🔎 Verificando microfone...';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('O navegador não disponibilizou o acesso ao microfone.');
+    }
+
+    if (!window.MediaRecorder) {
+      throw new Error('O navegador não possui suporte ao MediaRecorder.');
+    }
+
+    status.innerText = '🎙️ Solicitando acesso ao microfone...';
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    const tracks = stream.getAudioTracks();
+
+    if (!tracks || tracks.length === 0) {
+      throw new Error('O microfone foi autorizado, mas nenhuma faixa de áudio foi encontrada.');
+    }
+
+    let opcoes = {};
+
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      opcoes.mimeType = 'audio/webm;codecs=opus';
+    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+      opcoes.mimeType = 'audio/webm';
+    }
+
+    mediaRecorder = new MediaRecorder(stream, opcoes);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = function(event) {
+      if (event.data && event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onerror = function(event) {
+      status.className = 'status erro';
+      status.innerText = '❌ Erro no gravador.';
+      alert('Erro no gravador:\n\n' + (event.error ? event.error.message : 'Erro desconhecido'));
+    };
+
+    mediaRecorder.onstop = function() {
+      processarAudio();
+    };
+
+    mediaRecorder.start(1000);
+
+    inicioGravacao = Date.now();
+    tempoAcumulado = 0;
+    pausado = false;
+
+    clearInterval(intervaloTimer);
+    intervaloTimer = setInterval(atualizarTimer, 1000);
+
+    document.getElementById('btnIniciar').disabled = true;
+    document.getElementById('btnPausar').disabled = false;
+    document.getElementById('btnFinalizar').disabled = false;
+    document.getElementById('btnPausar').innerText = '⏸ Pausar';
+
+    status.className = 'status gravando';
+    status.innerText = '🔴 GRAVANDO — microfone ativo';
+
+  } catch (error) {
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+
+    stream = null;
+
+    status.className = 'status erro';
+    status.innerText = '❌ Não foi possível iniciar a gravação.';
+
+    alert('ERRO AO INICIAR GRAVAÇÃO\n\nTipo: ' + error.name + '\n\nMensagem: ' + error.message);
+
+  }
+
+}
+
+
+/* =====================================================
+   PAUSAR / CONTINUAR
+===================================================== */
+
+function pausarGravacao() {
+
+  if (!mediaRecorder) return;
+
+  if (mediaRecorder.state === 'recording') {
+
+    tempoAcumulado += Date.now() - inicioGravacao;
+    mediaRecorder.pause();
+    pausado = true;
+
+    clearInterval(intervaloTimer);
+
+    document.getElementById('btnPausar').innerText = '▶ Continuar';
+    document.getElementById('status').innerText = '⏸ Gravação pausada.';
+
+  } else if (mediaRecorder.state === 'paused') {
+
+    inicioGravacao = Date.now();
+    mediaRecorder.resume();
+    pausado = false;
+
+    intervaloTimer = setInterval(atualizarTimer, 1000);
+
+    document.getElementById('btnPausar').innerText = '⏸ Pausar';
+    document.getElementById('status').className = 'status gravando';
+    document.getElementById('status').innerText = '🔴 GRAVANDO — microfone ativo';
+
+  }
+
+}
+
+
+/* =====================================================
+   FINALIZAR
+===================================================== */
+
+function finalizarGravacao() {
+
+  if (!mediaRecorder) return;
+  if (mediaRecorder.state === 'inactive') return;
+
+  document.getElementById('status').className = 'status';
+  document.getElementById('status').innerText = '⏹ Finalizando gravação...';
+
+  clearInterval(intervaloTimer);
+
+  mediaRecorder.stop();
+
+  setTimeout(function() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    stream = null;
+  }, 300);
+
+  document.getElementById('btnPausar').disabled = true;
+  document.getElementById('btnFinalizar').disabled = true;
+
+}
+
+
+/* =====================================================
+   CRONÔMETRO
+===================================================== */
+
+function atualizarTimer() {
+
+  let total = tempoAcumulado;
+
+  if (!pausado && inicioGravacao) {
+    total += Date.now() - inicioGravacao;
+  }
+
+  const segundos = Math.floor(total / 1000);
+  const horas = String(Math.floor(segundos / 3600)).padStart(2, '0');
+  const minutos = String(Math.floor((segundos % 3600) / 60)).padStart(2, '0');
+  const seg = String(segundos % 60).padStart(2, '0');
+
+  document.getElementById('timer').innerText = horas + ':' + minutos + ':' + seg;
+
+}
+
+
+/* =====================================================
+   CONVERTE ÁUDIO PARA BASE64
+===================================================== */
+
+function blobParaBase64(blob) {
+
+  return new Promise(function(resolve, reject) {
+
+    const reader = new FileReader();
+
+    reader.onloadend = function() {
+      const partes = reader.result.split(',');
+      resolve(partes[1]);
+    };
+
+    reader.onerror = function(error) {
+      reject(error);
+    };
+
+    reader.readAsDataURL(blob);
+
+  });
+
+}
+
+
+/* =====================================================
+   PROCESSA ÁUDIO
+===================================================== */
+
+async function processarAudio() {
+
+  if (!audioChunks || audioChunks.length === 0) {
+    alert('Nenhum áudio foi capturado.');
+    resetarInterface();
+    return;
+  }
+
+  const blob = new Blob(audioChunks, {
+    type: mediaRecorder && mediaRecorder.mimeType ? mediaRecorder.mimeType : 'audio/webm'
+  });
+
+  if (blob.size === 0) {
+    alert('O arquivo de áudio ficou vazio.');
+    resetarInterface();
+    return;
+  }
+
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('resultado').style.display = 'none';
+  document.getElementById('status').className = 'status';
+  document.getElementById('status').innerText = '📤 Enviando áudio...';
+
+  try {
+
+    const base64 = await blobParaBase64(blob);
+
+    const resultado = await chamarBackend('processarReuniao', {
+      audioBase64: base64,
+      mimeType: blob.type || 'audio/webm',
+      nomeReuniao: document.getElementById('nomeReuniao').value,
+      participantes: document.getElementById('participantes').value,
+      duracao: document.getElementById('timer').innerText
+    });
+
+    mostrarResultado(resultado);
+
+  } catch (error) {
+
+    mostrarErro(error);
+
+  }
+
+}
+
+
+/* =====================================================
+   RESULTADO
+===================================================== */
+
+function mostrarResultado(resultado) {
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('resultado').style.display = 'block';
+
+  if (!resultado || !resultado.resumo) {
+    mostrarErro({ message: 'O servidor não retornou o resultado esperado.' });
+    return;
+  }
+
+  const resumo = resultado.resumo;
+
+  document.getElementById('resumo').innerText = resumo.resumo || '';
+
+  montarLista('principais', resumo.principais_pontos);
+  montarLista('decisoes', resumo.decisoes);
+  montarPendencias(resumo.pendencias);
+  montarLista('proximos', resumo.proximos_passos);
+
+  document.getElementById('transcricao').innerText = resultado.transcricao || '';
+
+  document.getElementById('status').className = 'status ok';
+  document.getElementById('status').innerText = '✅ Reunião processada com sucesso.';
+
+  resetarInterface();
+
+}
+
+
+/* =====================================================
+   LISTAS
+===================================================== */
+
+function montarLista(id, itens) {
+
+  const elemento = document.getElementById(id);
+  elemento.innerHTML = '';
+
+  if (!itens || itens.length === 0) {
+    elemento.innerHTML = '<div class="item">Nenhum registro identificado.</div>';
+    return;
+  }
+
+  itens.forEach(function(item) {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerText = item;
+    elemento.appendChild(div);
+  });
+
+}
+
+
+/* =====================================================
+   PENDÊNCIAS
+===================================================== */
+
+function montarPendencias(itens) {
+
+  const elemento = document.getElementById('pendencias');
+  elemento.innerHTML = '';
+
+  if (!itens || itens.length === 0) {
+    elemento.innerHTML = '<div class="item">Nenhuma pendência identificada.</div>';
+    return;
+  }
+
+  itens.forEach(function(item) {
+
+    const div = document.createElement('div');
+    div.className = 'pendencia';
+
+    const descricao = escapeHtml(item.descricao || '');
+    const responsavel = escapeHtml(item.responsavel || 'Não identificado');
+    const prazo = escapeHtml(item.prazo || 'Não informado');
+
+    div.innerHTML =
+      '<strong>' + descricao + '</strong>' +
+      '<div>👤 Responsável: ' + responsavel + '</div>' +
+      '<div>📅 Prazo: ' + prazo + '</div>';
+
+    elemento.appendChild(div);
+
+  });
+
+}
+
+
+/* =====================================================
+   ESCAPE HTML
+===================================================== */
+
+function escapeHtml(text) {
+
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+}
+
+
+/* =====================================================
+   ERRO
+===================================================== */
+
+function mostrarErro(error) {
+
+  document.getElementById('loading').style.display = 'none';
+
+  const mensagem = error && error.message ? error.message : String(error);
+
+  document.getElementById('status').className = 'status erro';
+  document.getElementById('status').innerText = '❌ Erro no processamento.';
+
+  alert('ERRO\n\n' + mensagem);
+
+  resetarInterface();
+
+}
+
+
+/* =====================================================
+   RESET
+===================================================== */
+
+function resetarInterface() {
+
+  document.getElementById('btnIniciar').disabled = false;
+  document.getElementById('btnPausar').disabled = true;
+  document.getElementById('btnFinalizar').disabled = true;
+  document.getElementById('btnPausar').innerText = '⏸ Pausar';
+
+}
+
+
+/* =====================================================
+   HISTÓRICO
+===================================================== */
+
+async function carregarHistorico() {
+
+  const elemento = document.getElementById('historico');
+  elemento.innerText = 'Carregando...';
+
+  try {
+
+    const lista = await chamarBackend('listarReunioes', {});
+    mostrarHistorico(lista);
+
+  } catch (error) {
+
+    elemento.innerText = error.message;
+
+  }
+
+}
+
+
+function mostrarHistorico(lista) {
+
+  const elemento = document.getElementById('historico');
+
+  if (!lista || lista.length === 0) {
+    elemento.innerText = 'Nenhuma reunião registrada.';
+    return;
+  }
+
+  let html = '<table><tr><th>Data</th><th>Reunião</th><th>Duração</th><th>Resumo</th></tr>';
+
+  lista.forEach(function(item) {
+    html +=
+      '<tr>' +
+      '<td>' + escapeHtml(item.data) + '</td>' +
+      '<td>' + escapeHtml(item.reuniao) + '</td>' +
+      '<td>' + escapeHtml(item.duracao) + '</td>' +
+      '<td>' + escapeHtml(item.resumo) + '</td>' +
+      '</tr>';
+  });
+
+  html += '</table>';
+
+  elemento.innerHTML = html;
+
+}
+
+</script>
+
+</body>
+</html>
